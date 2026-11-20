@@ -1,0 +1,8 @@
+experiment: E4
+description: One-connection TLS 1.3 goodput and CPU per byte
+configurations: [P1, A4, A5, P2]
+cipher_suites: [TLS_AES_128_GCM_SHA256, TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256]
+blocks: 20
+body_bytes: 536870912
+warmup_bytes: 67108864
+rtt_ms: 0

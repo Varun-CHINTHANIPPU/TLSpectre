@@ -1,0 +1,17 @@
+# C3/E4 bulk-transfer profile, NOT a complete E4 20-block experiment.
+# 512 MiB streamed body; one allowed AEAD suite; status responder excluded.
+provider: SunJSSE
+bindHost: 127.0.0.1
+httpsPort: 8443
+httpPort: 8080
+keyStore: pki/out/srv_plain.p12
+protocols: [TLSv1.3]
+cipherSuites: [TLS_CHACHA20_POLY1305_SHA256]
+namedGroups: [x25519]
+hsts: true
+httpRedirect: true
+sniHostCheck: true
+sessionCache: false
+ocspStapling: false
+ocspResponderUri: http://127.0.0.1:8888
+maxPayloadBytes: 536870912

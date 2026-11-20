@@ -1,0 +1,7 @@
+experiment: E3
+description: JMH AES-GCM/ChaCha20 primitive costs
+sizes: [64, 1024, 16384]
+providers_and_flags: [SunJCE, A4, A5, BC]
+forks: 10
+warmup_iterations: 5
+measurement_iterations: 10

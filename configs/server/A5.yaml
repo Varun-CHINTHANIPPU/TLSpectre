@@ -1,0 +1,16 @@
+# E3/E4 A5 ablation: disable ChaCha20/Poly1305 intrinsics.
+provider: SunJSSE
+bindHost: 127.0.0.1
+httpsPort: 8443
+httpPort: 8080
+keyStore: pki/out/srv_plain.p12
+protocols: [TLSv1.3]
+cipherSuites: [TLS_AES_256_GCM_SHA384, TLS_AES_128_GCM_SHA256, TLS_CHACHA20_POLY1305_SHA256]
+namedGroups: [x25519]
+hsts: true
+httpRedirect: true
+sniHostCheck: true
+sessionCache: false
+ocspStapling: false
+jvmFlags: ['-XX:+UnlockDiagnosticVMOptions', '-XX:-UseChaCha20Intrinsics', '-XX:-UsePoly1305Intrinsics']
+maxPayloadBytes: 536870912

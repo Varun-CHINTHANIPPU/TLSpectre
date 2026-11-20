@@ -1,0 +1,42 @@
+# Private lab PKI: never commit private keys, caches, or test results
+pki/out/
+*.key
+*.p12
+*.jks
+*.keylog
+*.pcap
+*.pcapng
+*.pem
+*.crt
+*.csr
+*.srl
+*.log
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+java/target/
+data/raw/
+data/references/
+data/processed/
+results/*
+!results/README.md
+java/bench/target/
+*.jsonl
+data/runtime/
+*.csv
+
+# Downloaded external tools and the E2 instrumentation agent
+third_party/
+
+# Operator-specific paths to gitignored measurement runs
+configs/artifact-selection.local.json
+
+# Local-only files
+*.egg-info/
+data/full-logs/
+runs/
+tls_debug_report.txt
+all.txt
+TLSpectre/

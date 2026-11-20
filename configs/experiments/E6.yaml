@@ -1,0 +1,9 @@
+experiment: E6
+description: Revocation policies under 24 controlled scenarios
+statuses: [good, revoked]
+stapling: [off, on]
+must_staple: [false, true]
+responder_reachable: [false, true]
+freshness_when_on: [fresh, expired]
+policies: [K1_curl, K2_java_hard, K3_java_soft, K4_java_default, K5_python_crl]
+repetitions: 5

@@ -1,0 +1,15 @@
+# TLS 1.2 intentionally re-enabled, using conf/dual_stack.security.
+provider: SunJSSE
+bindHost: 127.0.0.1
+httpsPort: 8443
+httpPort: 8080
+keyStore: pki/out/srv_plain.p12
+protocols: [TLSv1.2, TLSv1.3]
+cipherSuites: [TLS_AES_256_GCM_SHA384, TLS_CHACHA20_POLY1305_SHA256, TLS_AES_128_GCM_SHA256, TLS_ECDHE_ECDSA_WITH_AES_128_GCM_SHA256]
+namedGroups: [X25519MLKEM768, x25519, secp256r1]
+hsts: true
+httpRedirect: true
+sniHostCheck: true
+sessionCache: false
+ocspStapling: true
+ocspResponderUri: http://127.0.0.1:8888

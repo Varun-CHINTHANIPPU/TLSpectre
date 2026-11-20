@@ -1,0 +1,5 @@
+experiment: E1
+description: Protocol and configuration negative probes (PR01-PR22)
+configurations: [P1, P2, B1, B2, B3, A1, A2, A3]
+repetitions: 3
+probe_catalogue: configs/probes/PR01-PR22.yaml

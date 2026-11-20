@@ -1,0 +1,8 @@
+experiment: E5
+description: Hybrid and classical full-handshake cost
+groups: [x25519, X25519MLKEM768, SecP256r1MLKEM768, SecP384r1MLKEM1024]
+providers: [SunJSSE, BCJSSE]
+blocks: 10
+rtt_ms: [0, 50]
+handshakes_0ms: 2000
+handshakes_50ms: 300

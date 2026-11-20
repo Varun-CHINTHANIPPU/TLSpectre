@@ -1,0 +1,7 @@
+experiment: E7
+description: OCSP stapling warm, cold and off
+stapling: [off, warm, cold]
+responder_rtt_ms: [0, 50]
+blocks: 30
+handshakes_per_warm_off_block: 500
+cold_restarts_per_block: 30

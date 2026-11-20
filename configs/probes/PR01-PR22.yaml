@@ -1,0 +1,91 @@
+# PR01–PR22 exactly as enumerated in the 28-page design, page 19.
+# No result is considered PASS without an observed, independently checked outcome.
+probes:
+  - id: PR01
+    category: version
+    description: "TLS1.2 attempted against TLS1.3-only"
+    runner: tls12_negotiation
+  - id: PR02
+    category: version
+    description: "SSLv3/TLS1.0/TLS1.1 disabled"
+    runner: legacy_versions
+  - id: PR03
+    category: version
+    description: "ClientHello without supported_versions"
+    runner: tlsfuzzer_supported_versions
+  - id: PR04
+    category: downgrade
+    description: "TLS1.2 downgrade sentinel ServerHello.random"
+    runner: downgrade_sentinel
+  - id: PR05
+    category: suite
+    description: "TLS1.2-only cipher suites against TLS1.3-only endpoint"
+    runner: tls12_suite
+  - id: PR06
+    category: suite
+    description: "Client favors ChaCha20; server preference is checked"
+    runner: suite_order
+  - id: PR07
+    category: group
+    description: "Only disallowed finite-field group is offered"
+    runner: group_rejection
+  - id: PR08
+    category: group
+    description: "Named group enumeration"
+    runner: tlsfuzzer_groups
+  - id: PR09
+    category: record
+    description: "Duplicate application record"
+    runner: record_duplicate
+  - id: PR10
+    category: record
+    description: "Bit-flip an encrypted record tag"
+    runner: record_bitflip
+  - id: PR11
+    category: record
+    description: "Drop an encrypted application record"
+    runner: record_drop
+  - id: PR12
+    category: record
+    description: "Truncate a TLS record"
+    runner: record_truncate
+  - id: PR13
+    category: replay
+    description: "Resumption with 0-RTT early data"
+    runner: zero_rtt
+  - id: PR14
+    category: replay
+    description: "Replay captured handshake flight"
+    runner: handshake_replay
+  - id: PR15
+    category: post_handshake
+    description: "KeyUpdate update_requested"
+    runner: tlsfuzzer_keyupdate
+  - id: PR16
+    category: http
+    description: "HSTS on 200"
+    runner: hsts200
+  - id: PR17
+    category: http
+    description: "HSTS on 404"
+    runner: hsts404
+  - id: PR18
+    category: http
+    description: "Permanent HTTP to HTTPS redirect"
+    runner: redirect
+  - id: PR19
+    category: fingerprint
+    description: "Server/X-Powered-By absent"
+    runner: banner
+  - id: PR20
+    category: stapling
+    description: "Stapled valid OCSP response"
+    runner: staple
+  - id: PR21
+    category: sni
+    description: "SNI and Host mismatch rejected"
+    runner: sni_mismatch
+  - id: PR22
+    category: legacy
+    description: "Legacy compression method rejected"
+    runner: tlsfuzzer_compression

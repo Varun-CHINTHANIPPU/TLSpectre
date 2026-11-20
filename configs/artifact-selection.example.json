@@ -1,0 +1,12 @@
+{
+  "runs": {
+    "E1": "data/raw/E1/20261120T142519Z_f03597fc1522",
+    "E2": "data/raw/E2/20261117T235710Z_5e688f5fd1cb",
+    "E3": "data/raw/E3/20261118T010442Z_61e1f7580b51",
+    "E4": "data/raw/E4/20261118T124314Z_6f586790da8e",
+    "E5": "data/raw/E5/20261118T133520Z_127388dd70eb",
+    "E6": "data/raw/E6/20261118T133102Z_510597d6cebc",
+    "E7": "data/raw/E7/20261120T113438Z_4ebc6f59f688"
+  },
+  "e7_reference": "data/references/E7/20261120T095847Z_3ad4d66167d1"
+}

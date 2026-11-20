@@ -1,0 +1,15 @@
+# E2/E5 per-cell named-group override, not part of P1's standard HC3 profile.
+provider: SunJSSE
+bindHost: 127.0.0.1
+httpsPort: 8443
+httpPort: 8080
+keyStore: pki/out/srv_plain.p12
+protocols: [TLSv1.3]
+cipherSuites: [TLS_AES_128_GCM_SHA256, TLS_CHACHA20_POLY1305_SHA256, TLS_AES_256_GCM_SHA384]
+namedGroups: [SecP256r1MLKEM768]
+hsts: true
+httpRedirect: true
+sniHostCheck: true
+sessionCache: false
+ocspStapling: true
+ocspResponderUri: http://127.0.0.1:8888

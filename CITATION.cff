@@ -1,0 +1,9 @@
+cff-version: 1.2.0
+message: "If you use this laboratory software, please cite the repository version and commit."
+title: "TLS 1.3 Hardening and Protocol Analysis for Java Servers"
+type: software
+authors:
+  - name: "TLS Lab Contributors"
+repository-code: "https://github.com/Varun-CHINTHANIPPU/TLSpectre"
+license: MIT
+date-released: 2026-11-14

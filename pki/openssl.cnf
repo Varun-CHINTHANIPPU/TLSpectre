@@ -1,0 +1,66 @@
+[ req ]
+prompt = no
+distinguished_name = dn
+x509_extensions = v3_ca
+
+[ dn ]
+CN = TLS13-Lab Root CA
+
+[ ca ]
+default_ca = local_ca
+
+[ local_ca ]
+dir = ./pki/out
+database = $dir/index.txt
+new_certs_dir = $dir/newcerts
+serial = $dir/serial
+crlnumber = $dir/crlnumber
+certificate = $dir/ca.crt
+private_key = $dir/ca.key
+default_md = sha256
+default_days = 365
+default_crl_days = 30
+policy = any_subject
+email_in_dn = no
+copy_extensions = none
+unique_subject = no
+
+[ any_subject ]
+commonName = supplied
+
+[ v3_ca ]
+basicConstraints = critical, CA:true, pathlen:0
+keyUsage = critical, keyCertSign, cRLSign
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid:always
+
+[ ocsp_signer ]
+basicConstraints = critical, CA:false
+keyUsage = critical, digitalSignature
+extendedKeyUsage = critical, OCSPSigning
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+
+[ srv_plain ]
+basicConstraints = critical, CA:false
+keyUsage = critical, digitalSignature
+extendedKeyUsage = serverAuth
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+subjectAltName = @server_names
+authorityInfoAccess = OCSP;URI:http://127.0.0.1:8888
+
+[ srv_muststaple ]
+basicConstraints = critical, CA:false
+keyUsage = critical, digitalSignature
+extendedKeyUsage = serverAuth
+subjectKeyIdentifier = hash
+authorityKeyIdentifier = keyid,issuer
+subjectAltName = @server_names
+authorityInfoAccess = OCSP;URI:http://127.0.0.1:8888
+tlsfeature = status_request
+
+[ server_names ]
+DNS.1 = lab.test
+DNS.2 = localhost
+IP.1 = 127.0.0.1

@@ -1,0 +1,260 @@
+name: checks
+on:
+  push:
+  pull_request:
+jobs:
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[dev]'
+      - name: Check tracked files for private keys and raw evidence
+        run: python scripts/check_tracked_secrets.py
+      - name: Check reproducible artifact exporter CLI
+        run: python scripts/generate_final_artifacts.py --help
+      - run: make test
+      - run: python -m compileall -q harness scripts tests
+      - name: PKI fixture generation
+        run: KS_PASS='ci-only-test-password' make pki
+      - name: Verify cert extensions
+        run: |
+          openssl x509 -in pki/out/srv_muststaple.crt -noout -text | grep -A2 -E 'TLS Feature|TLS Feature'
+          openssl verify -CAfile pki/out/ca.crt pki/out/srv_plain.crt
+  java:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '27'
+          cache: maven
+          cache-dependency-path: java/pom.xml
+      - run: make build
+      - run: make test-java
+      - run: make bench
+  integration:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '27'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[dev]'
+      - name: Resolve E2 agent and verify startup manifest
+        run: make e2-agent
+      - run: make build
+      - run: KS_PASS='ci-only-test-password' make pki
+      - name: Start P1 and run bounded smoke probes
+        env:
+          KS_PASS: ci-only-test-password
+        run: |
+          # Isolate the smoke JVM in a process group: killing only make leaves
+          # its Java subprocess bound to 8443 and contaminates later E1 runs.
+          setsid make server CONFIG=configs/server/P1.yaml > /tmp/tlslab-server.log 2>&1 &
+          PID=$!
+          trap 'kill -TERM -- "-$PID" 2>/dev/null || true; wait "$PID" 2>/dev/null || true' EXIT
+          for i in $(seq 1 20); do
+            if grep -q 'TLSLAB READY' /tmp/tlslab-server.log; then break; fi
+            if ! kill -0 "$PID" 2>/dev/null; then cat /tmp/tlslab-server.log; exit 1; fi
+            sleep 1
+          done
+          cat /tmp/tlslab-server.log
+          make probe CONFIG=configs/server/P1.yaml
+          java -cp java/target/tlslab-server.jar lab.tls13.client.BulkClient \
+            127.0.0.1 8443 lab.test SunJSSE TLS_AES_128_GCM_SHA256 \
+            1048576 262144 pki/out/truststore.p12 > /tmp/e4-bulk-smoke.csv
+          python -c 'import csv; rows=list(csv.DictReader(open("/tmp/e4-bulk-smoke.csv"))); assert len(rows)==1 and rows[0]["measured_bytes"]=="786432" and float(rows[0]["mib_per_second"])>0'
+      - name: Execute E4 twelve-condition pilot with verified nonzero goodput
+        env:
+          KS_PASS: ci-only-test-password
+        run: |
+          PYTHONPATH=harness python -m tlslab.run_experiment E4 --run --pilot
+          python - <<'PY'
+          from pathlib import Path
+          import pandas as pd
+          outputs = sorted(Path('data/raw/E4').glob('*/results.parquet'))
+          assert outputs, 'E4 pilot did not create results'
+          table = pd.read_parquet(outputs[-1])
+          print(table[[x for x in ('configuration','suite','status','mib_per_second','error') if x in table.columns]].to_string(index=False))
+          assert len(table)==12, 'Incomplete 12-condition pilot matrix'
+          assert table['status'].eq('MEASURED').all(), 'One or more E4 pilot cells failed'
+          assert (table['mib_per_second']>0).all(), 'Nonpositive goodput'
+          PY
+
+      - name: E1 full 22-probe pilot (instrumented P1)
+        timeout-minutes: 25
+        env:
+          KS_PASS: ci-only-test-password
+        run: |
+          make tools
+          PYTHONPATH=harness python -m tlslab.run_experiment E1 --run --pilot
+          python - <<'PY'
+          from pathlib import Path
+          import pandas as pd
+          import json
+          files = sorted(Path("data/raw/E1").glob("*/results.parquet"))
+          assert files
+          frame = pd.read_parquet(files[-1])
+          print(frame[["probe_id","outcome"]].to_string(index=False))
+          raw = files[-1].parent/"raw_evidence.jsonl"
+          if raw.exists():
+              for line in raw.open():
+                  entry=json.loads(line)
+                  print(entry["row"]["probe_id"],entry["observation"][:500])
+                  if entry["row"]["probe_id"] in ("PR09","PR14","PR15","PR22"):
+                      print("EVIDENCE:",str(entry.get("details",{}))[:2500])
+          for log in sorted((files[-1].parent/"logs").glob("P1_*.log")):
+              print("SERVER LOG:",log)
+              print(log.read_text(errors="replace")[-3000:])
+          assert len(frame)==22, "Missing E1 pilot probes"
+          required={"PR09","PR10","PR11","PR12","PR14"}
+          assert frame.loc[frame["probe_id"].isin(required), "outcome"].eq("PASS").all(), "Calibrated record/replay probes regressed"
+          pr22 = [json.loads(line) for line in raw.read_text().splitlines()
+                  if json.loads(line)["row"]["probe_id"] == "PR22"][0]
+          assert "independent_wire" in pr22["details"], "PR22 missing independently built ClientHello"
+          assert pr22["details"]["independent_wire"]["verdict"] in ("PASS", "FAIL"), "PR22 raw-wire control inconclusive"
+          PY
+      - name: OpenSSL independent reference for malformed TLS 1.3 compression
+        timeout-minutes: 3
+        run: |
+          openssl s_server -accept 127.0.0.1:9444 -tls1_3 -quiet \
+            -cert pki/out/srv_plain.crt -key pki/out/srv_plain.key \
+            > /tmp/tlslab-openssl-reference.log 2>&1 &
+          PID=$!
+          trap 'kill "$PID" 2>/dev/null || true; wait "$PID" 2>/dev/null || true' EXIT
+          PYTHONPATH=harness python - <<'PY'
+          import socket
+          import time
+          from tlslab.tls13_wire_probe import probe
+          for _ in range(40):
+              try:
+                  with socket.create_connection(("127.0.0.1", 9444), timeout=.3):
+                      break
+              except OSError:
+                  time.sleep(.1)
+          else:
+              raise RuntimeError("OpenSSL reference failed to listen")
+          evidence = probe(port=9444)
+          print("OpenSSL reference:", evidence)
+          assert evidence["verdict"] == "PASS", "Reference server did not reject both malformed ClientHellos"
+          PY
+
+
+      - name: E7 independent nginx/OpenSSL reference pilot (0ms only)
+        timeout-minutes: 10
+        env:
+          KS_PASS: ci-only-test-password
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y nginx
+          PYTHONPATH=harness python -m tlslab.run_experiment E7 --run --pilot --reference-b3
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          import pandas as pd
+          paths = sorted(Path("data/references/E7").glob("*/results.parquet"))
+          assert paths, "Independent E7 B3 reference did not produce any results"
+          data = pd.read_parquet(paths[-1])
+          print(data[[x for x in ("block","stapling","rtt_ms","status","n_handshakes",
+                                  "full_handshake_verified","error") if x in data]].to_string(index=False))
+          manifest = json.loads((paths[-1].parent/"manifest.json").read_text())
+          assert len(data) == 3, "Reference pilot requires off, warm and cold"
+          assert set(data["stapling"]) == {"off", "warm", "cold"}
+          assert data["rtt_ms"].eq(0).all()
+          assert data["status"].eq("MEASURED").all(), "Reference test failed; see row errors"
+          assert data["full_handshake_verified"].eq(True).all()
+          assert manifest["disposition"] == "PARTIAL", "Pilot must never claim publication-ready completion"
+          PY
+
+  research-pilots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '27'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -e '.[dev]'
+      - run: make build
+      - run: KS_PASS='ci-only-test-password' make pki
+      - name: Randomized E3 JMH runner smoke pilot
+        timeout-minutes: 5
+        run: |
+          make bench
+          PYTHONPATH=harness python -m tlslab.run_experiment E3 --run --pilot
+          python - <<'PY'
+          from pathlib import Path
+          import pandas as pd
+          import json
+          paths = sorted(Path("data/raw/E3").glob("*/results.parquet"))
+          assert paths, "E3 pilot did not produce results"
+          p = paths[-1]
+          df = pd.read_parquet(p)
+          print(df[["block", "position", "platform", "status", "fork"]].to_string(index=False))
+          manifest = json.loads((p.parent / "manifest.json").read_text())
+          assert len(df) == 2 and df["status"].eq("MEASURED").all()
+          assert set(df["platform"]) == {"SunJCE", "A5"}, "Pilot must compare baseline and ablation"
+          assert df["block"].eq(1).all() and df["jmh_fork"].eq(1).all()
+          assert manifest["metadata"]["replication_design"] == "randomized cross-condition blocks"
+          assert len(list((p.parent / "jmh").glob("*.json"))) == 2
+          assert len((p.parent / "evidence.jsonl").read_text().splitlines()) == 2
+          PY
+      - name: BCJSSE hybrid handshake pilot (E5)
+        env:
+          KS_PASS: ci-only-test-password
+        run: |
+          PYTHONPATH=harness python -m tlslab.run_experiment E5 --run --pilot --bc-pilot
+          python - <<'PY'
+          from pathlib import Path
+          import pandas as pd
+          f=sorted(Path("data/raw/E5").glob("*/results.parquet"))[-1]
+          df=pd.read_parquet(f)
+          print(df.to_string(index=False))
+          assert len(df)==3 and df["status"].eq("MEASURED").all()
+          assert (df["p95_handshake_ms"]>=df["handshake_ms"]).all()
+          PY
+      - name: Revocation policy pilot (E6)
+        if: always()
+        env:
+          KS_PASS: ci-only-test-password
+        run: |
+          PYTHONPATH=harness python -m tlslab.run_experiment E6 --run --pilot
+          python - <<'PY'
+          from pathlib import Path
+          import pandas as pd
+          f=sorted(Path("data/raw/E6").glob("*/results.parquet"))[-1]
+          df=pd.read_parquet(f)
+          print(df.to_string(index=False))
+          assert len(df)==10
+          assert df["outcome"].isin(["ACCEPT","REJECT"]).all()
+          assert "staple_observed" in df.columns
+          assert df.loc[df["stapling"].eq("on"), "staple_observed"].eq(True).all(), "Fresh stapling not observed"
+          assert df.loc[df["stapling"].eq("off"), "staple_observed"].eq(False).all(), "Stapling-off absence not verified"
+          PY
+      - name: OCSP latency pilot (E7)
+        if: always()
+        env:
+          KS_PASS: ci-only-test-password
+        run: |
+          PYTHONPATH=harness python -m tlslab.run_experiment E7 --run --pilot
+          python - <<'PY'
+          from pathlib import Path
+          import pandas as pd
+          f=sorted(Path("data/raw/E7").glob("*/results.parquet"))[-1]
+          df=pd.read_parquet(f)
+          print(df.to_string(index=False))
+          assert len(df)==3 and set(df["rtt_ms"])=={0} and df["status"].eq("MEASURED").all()
+          assert (df["handshake_p95_ms"]>=df["handshake_ms"]).all()
+          PY
