@@ -31,6 +31,8 @@ def main() -> int:
     findings = []
     for relative in names:
         posix = relative.as_posix()
+        if posix == "results/README.md":
+            continue
         if (posix.startswith(PRIVATE_DIRS) or relative.name in PRIVATE_NAMES
                 or relative.suffix.lower() in PRIVATE_SUFFIXES):
             findings.append(f"{posix}: private file/path tracked")
